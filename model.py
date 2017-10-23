@@ -4,6 +4,8 @@ import numpy as np
 
 from keras.layers import Flatten, Dense, Lambda, Convolution2D, MaxPooling2D, Cropping2D, Dropout
 from keras.models import Sequential
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 from os import listdir
 from os.path import isdir, isfile, join
 
@@ -11,29 +13,37 @@ DATA_ROOT_PATH = './data'
 DRIVING_LOG_FILE_NAME = 'driving_log.csv'
 CORRECTION = 0.2
 
+class Sample:
+    def __init__(self, path, angle, flip=False):
+        self.path = path
+        self.angle = angle
+        self.flip = flip
+
+    def image(self):
+        image_partial_path = '/'.join(self.path.split('/')[-3:])
+        current_path = join(DATA_ROOT_PATH, image_partial_path)
+        image = cv2.imread(current_path)
+        if self.flip:
+            image = np.fliplr(image)
+        return image
+        
 
 def read_data():
     """Read data from data directory."""
-    images = []
-    angles = []
+    samples = []
     for sub_dir_name in listdir(DATA_ROOT_PATH):
         sub_dir = join(DATA_ROOT_PATH, sub_dir_name)
         if not isdir(sub_dir) or not isfile(join(sub_dir, DRIVING_LOG_FILE_NAME)):
             continue
-        for image_center, image_left, image_right, angle in read_data_from_one_dir(sub_dir):
-            images.extend([image_center, image_left, image_right, np.fliplr(
-                image_center), np.fliplr(image_left), np.fliplr(image_right)])
-            angles.extend([angle, angle + CORRECTION, angle - CORRECTION, -
-                           angle, -angle - CORRECTION, -angle + CORRECTION])
-    return np.array(images), np.array(angles)
-
-
-def read_image(original_image_path):
-    """Read image from a path"""
-    image_partial_path = '/'.join(original_image_path.split('/')[-3:])
-    current_path = join(DATA_ROOT_PATH, image_partial_path)
-    image = cv2.imread(current_path)
-    return cv2.imread(current_path)
+        for image_center_path, image_left_path, image_right_path, angle in read_data_from_one_dir(sub_dir):
+            samples.extend([
+                Sample(image_center_path, angle),
+                Sample(image_left_path, angle + CORRECTION),
+                Sample(image_right_path, angle - CORRECTION),
+                Sample(image_center_path, angle, True),
+                Sample(image_left_path, angle + CORRECTION, True),
+                Sample(image_right_path, angle - CORRECTION, True)])
+    return samples
 
 
 def read_data_from_one_dir(data_dir):
@@ -42,8 +52,23 @@ def read_data_from_one_dir(data_dir):
     with open(join(data_dir, DRIVING_LOG_FILE_NAME)) as csv_file:
         reader = csv.reader(csv_file)
         for line in reader:
-            yield read_image(line[0]), read_image(line[1]), read_image(line[2]), float(line[3])
+            yield line[0], line[1], line[2], float(line[3])
 
+def generator(samples, batch_size=32):
+    num_samples = len(samples)
+    while 1: # Loop forever so the generator never terminates
+        shuffle(samples)
+        for offset in range(0, num_samples, batch_size):
+            batch_samples = samples[offset:offset+batch_size]    
+            images = []
+            angles = []
+            for sample in batch_samples:
+                images.append(sample.image())
+                angles.append(sample.angle)
+                X_train = np.array(images)
+                y_train = np.array(angles)
+                yield shuffle(X_train, y_train)
+            
 
 def lenet():
     """Lenet architecture used at first, before using Nvidia architecture."""
@@ -86,8 +111,15 @@ def nvidia():
 
 
 if __name__ == '__main__':
-    X_data, y_data = read_data()
+    samples = read_data()
+    train_samples, validation_samples = train_test_split(samples, test_size=0.2)                
+    train_generator = generator(train_samples, batch_size=32)
+    validation_generator = generator(validation_samples, batch_size=32)
     model = nvidia()
-    model.fit(X_data, y_data, validation_split=0.2, shuffle=True, nb_epoch=5)
+    model.fit_generator(train_generator,
+                        samples_per_epoch=len(train_samples),
+                        validation_data=validation_generator,
+                        nb_val_samples=len(validation_samples),
+                        nb_epoch=5)
     print('Training complete, saving model')
     model.save('model.h5')
