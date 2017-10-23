@@ -79,7 +79,7 @@ The model was trained on both original images, and horizontally flipped images, 
 
 #### 3. Model parameter tuning
 
-The model used an adam optimizer, so the learning rate was not tuned manually (model.py line 84).
+The model used an adam optimizer, so the learning rate was not tuned manually (model.py line 109).
 
 #### 4. Appropriate training data
 
@@ -109,7 +109,7 @@ Then I tried the Nvidia model, and it seems to work better: the model drives for
 
 ####2. Final Model Architecture
 
-The final model architecture (model.py lines 66-85) consisted of a convolution neural network with the following layers and layer sizes:
+The final model architecture (model.py lines 91-110) consisted of a convolution neural network with the following layers and layer sizes:
 * Cropping layer
 * Normalization layer
 * Convolutional layer with 5x5 filter, 24 channels and 2x2 downsampling
@@ -125,7 +125,7 @@ The final model architecture (model.py lines 66-85) consisted of a convolution n
 
 ####3. Creation of the Training Set & Training Process
 
-To make data collection easier, I made data reading process more flexible: instead of taking one set of data (from a single `driving_log.csv`), the `read_data()` function (model.py line 15 - 28) can take multiple sets of data, and each set has a `driving_log.csv`. Therefore, each time I can record a set of data into a separate directory under `data/` instead of appending data into an existing directory.
+To make data collection easier, I made data reading process more flexible: instead of taking one set of data (from a single `driving_log.csv`), the `read_data()` function (model.py line 31-46) can take multiple sets of data, and each set has a `driving_log.csv`. Therefore, each time I can record a set of data into a separate directory under `data/` instead of appending data into an existing directory.
 
 To capture good driving behavior, I first recorded two sets of data using center lane driving. Here is an example image of center lane driving:
 
